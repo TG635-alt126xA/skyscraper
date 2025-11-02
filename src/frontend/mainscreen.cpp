@@ -28,6 +28,7 @@
 #include <OgreViewport.h>
 #include <OgreCamera.h>
 #include <OgreRTShaderSystem.h>
+#include <OgreImGuiOverlay.h>
 #include "globals.h"
 #include "sbs.h"
 #include "camera.h"
@@ -37,6 +38,7 @@
 #include "hal.h"
 #include "sky.h"
 #include "gui.h"
+#include "editor.h"
 #include "enginecontext.h"
 #include "loaddialog.h"
 #include "mainscreen.h"
@@ -56,6 +58,54 @@ BEGIN_EVENT_TABLE(MainScreen, wxFrame)
   EVT_JOYSTICK_EVENTS(MainScreen::OnJoystickEvent)
 #endif
 END_EVENT_TABLE()
+
+static ImGuiKey ToImGuiKey(int k)
+{
+	switch (k)
+	{
+		case 'A': return ImGuiKey_A; case 'B': return ImGuiKey_B; case 'C': return ImGuiKey_C; case 'D': return ImGuiKey_D;
+		case 'E': return ImGuiKey_E; case 'F': return ImGuiKey_F; case 'G': return ImGuiKey_G; case 'H': return ImGuiKey_H;
+		case 'I': return ImGuiKey_I; case 'J': return ImGuiKey_J; case 'K': return ImGuiKey_K; case 'L': return ImGuiKey_L;
+		case 'M': return ImGuiKey_M; case 'N': return ImGuiKey_N; case 'O': return ImGuiKey_O; case 'P': return ImGuiKey_P;
+		case 'Q': return ImGuiKey_Q; case 'R': return ImGuiKey_R; case 'S': return ImGuiKey_S; case 'T': return ImGuiKey_T;
+		case 'U': return ImGuiKey_U; case 'V': return ImGuiKey_V; case 'W': return ImGuiKey_W; case 'X': return ImGuiKey_X;
+		case 'Y': return ImGuiKey_Y; case 'Z': return ImGuiKey_Z;
+		case '0': return ImGuiKey_0; case '1': return ImGuiKey_1; case '2': return ImGuiKey_2; case '3': return ImGuiKey_3;
+		case '4': return ImGuiKey_4; case '5': return ImGuiKey_5; case '6': return ImGuiKey_6; case '7': return ImGuiKey_7;
+		case '8': return ImGuiKey_8; case '9': return ImGuiKey_9;
+
+		case WXK_F1: return ImGuiKey_F1; case WXK_F2: return ImGuiKey_F2; case WXK_F3: return ImGuiKey_F3; case WXK_F4: return ImGuiKey_F4;
+		case WXK_F5: return ImGuiKey_F5; case WXK_F6: return ImGuiKey_F6; case WXK_F7: return ImGuiKey_F7; case WXK_F8: return ImGuiKey_F8;
+		case WXK_F9: return ImGuiKey_F9; case WXK_F10: return ImGuiKey_F10; case WXK_F11: return ImGuiKey_F11; case WXK_F12: return ImGuiKey_F12;
+
+		case WXK_LEFT: return ImGuiKey_LeftArrow; case WXK_RIGHT: return ImGuiKey_RightArrow;
+		case WXK_UP: return ImGuiKey_UpArrow; case WXK_DOWN: return ImGuiKey_DownArrow;
+		case WXK_HOME: return ImGuiKey_Home; case WXK_END: return ImGuiKey_End;
+		case WXK_PAGEUP: return ImGuiKey_PageUp; case WXK_PAGEDOWN: return ImGuiKey_PageDown;
+		case WXK_INSERT: return ImGuiKey_Insert; case WXK_DELETE: return ImGuiKey_Delete;
+		case WXK_BACK: return ImGuiKey_Backspace; case WXK_TAB: return ImGuiKey_Tab;
+		case WXK_RETURN: return ImGuiKey_Enter; case WXK_ESCAPE: return ImGuiKey_Escape; case WXK_SPACE: return ImGuiKey_Space;
+
+		case WXK_CONTROL: return ImGuiKey_LeftCtrl;
+		case WXK_SHIFT:   return ImGuiKey_LeftShift;
+		case WXK_ALT:     return ImGuiKey_LeftAlt;
+	#if defined(__APPLE__)
+		//case WXK_COMMAND: return ImGuiKey_LeftSuper;
+	#else
+		case WXK_WINDOWS_MENU: return ImGuiKey_LeftSuper;
+	#endif
+		default: return ImGuiKey_None;
+	}
+}
+
+static void UpdateImguiModsFromWx(const wxKeyEvent& e)
+{
+	ImGuiIO& io = ImGui::GetIO();
+	io.AddKeyEvent(ImGuiMod_Ctrl, e.ControlDown());
+	io.AddKeyEvent(ImGuiMod_Shift, e.ShiftDown());
+	io.AddKeyEvent(ImGuiMod_Alt, e.AltDown());
+	io.AddKeyEvent(ImGuiMod_Super, e.MetaDown()); // macOS Command = Meta
+}
 
 MainScreen::MainScreen(Skyscraper *parent, int width, int height) : wxFrame(0, -1, wxT(""), wxDefaultPosition, wxDefaultSize, wxDEFAULT_FRAME_STYLE)
 {
@@ -104,6 +154,7 @@ MainScreen::MainScreen(Skyscraper *parent, int width, int height) : wxFrame(0, -
 	joy_click = hal->GetConfigInt(hal->joyconfigfile, "Skyscraper.Frontend.Joystick.Click", 0);
 	joy_fast = hal->GetConfigInt(hal->joyconfigfile, "Skyscraper.Frontend.Joystick.Fast", 1);
 	joy_strafe = hal->GetConfigInt(hal->joyconfigfile, "Skyscraper.Frontend.Joystick.Strafe", 2);
+	joy_jump = hal->GetConfigInt(hal->joyconfigfile, "Skyscraper.Frontend.Joystick.Jump", 3);
 	joy_turn = hal->GetConfigInt(hal->joyconfigfile, "Skyscraper.Frontend.Joystick.Turn", 0);
 	joy_forward = hal->GetConfigInt(hal->joyconfigfile, "Skyscraper.Frontend.Joystick.Forward", 1);
 #endif
@@ -112,6 +163,7 @@ MainScreen::MainScreen(Skyscraper *parent, int width, int height) : wxFrame(0, -
 	panel = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(width, height), wxNO_BORDER);
 	panel->Connect(wxID_ANY, wxEVT_KEY_DOWN, wxKeyEventHandler(MainScreen::OnKeyDown), NULL, this);
 	panel->Connect(wxID_ANY, wxEVT_KEY_UP, wxKeyEventHandler(MainScreen::OnKeyUp), NULL, this);
+	panel->Connect(wxID_ANY, wxEVT_MOTION, wxMouseEventHandler(MainScreen::OnMouseMove), NULL, this);
 	panel->Connect(wxID_ANY, wxEVT_LEFT_DOWN, wxMouseEventHandler(MainScreen::OnMouseButton), NULL, this);
 	panel->Connect(wxID_ANY, wxEVT_LEFT_UP, wxMouseEventHandler(MainScreen::OnMouseButton), NULL, this);
 	panel->Connect(wxID_ANY, wxEVT_LEFT_DCLICK, wxMouseEventHandler(MainScreen::OnMouseButton), NULL, this);
@@ -122,6 +174,10 @@ MainScreen::MainScreen(Skyscraper *parent, int width, int height) : wxFrame(0, -
 	panel->Connect(wxID_ANY, wxEVT_RIGHT_UP, wxMouseEventHandler(MainScreen::OnMouseButton), NULL, this);
 	panel->Connect(wxID_ANY, wxEVT_RIGHT_DCLICK, wxMouseEventHandler(MainScreen::OnMouseButton), NULL, this);
 	panel->Connect(wxID_ANY, wxEVT_MOUSEWHEEL, wxMouseEventHandler(MainScreen::OnMouseButton), NULL, this);
+	panel->Connect(wxID_ANY, wxEVT_LEAVE_WINDOW, wxMouseEventHandler(MainScreen::OnMouseLeave), NULL, this);
+	panel->Connect(wxID_ANY, wxEVT_CHAR, wxKeyEventHandler(MainScreen::OnChar), NULL, this);
+	panel->Connect(wxID_ANY, wxEVT_SET_FOCUS, wxFocusEventHandler(MainScreen::OnFocus), NULL, this);
+	panel->Connect(wxID_ANY, wxEVT_KILL_FOCUS, wxFocusEventHandler(MainScreen::OnKillFocus), NULL, this);
 }
 
 MainScreen::~MainScreen()
@@ -137,6 +193,8 @@ void MainScreen::OnIconize(wxIconizeEvent& event)
 	//pause simulator while minimized
 
 	VM *vm = frontend->GetVM();
+	if (!vm)
+		return;
 	vm->Pause = event.IsIconized();
 
 	if (vm->Pause == true)
@@ -148,6 +206,8 @@ void MainScreen::OnIconize(wxIconizeEvent& event)
 void MainScreen::OnSize(wxSizeEvent& WXUNUSED(event))
 {
 	VM *vm = frontend->GetVM();
+	if (!vm)
+		return;
 	HAL *hal = vm->GetHAL();
 
 	if (panel)
@@ -190,6 +250,9 @@ void MainScreen::ShowWindow()
 
 void MainScreen::OnIdle(wxIdleEvent& event)
 {
+	if (!frontend->GetVM())
+		return;
+
 	//prevent simultaneous executions - this fixes an issue with wxYield
 	if (InLoop == false)
 	{
@@ -201,6 +264,11 @@ void MainScreen::OnIdle(wxIdleEvent& event)
 				panel->SetFocus();
 
 			try {
+				Editor *editor = frontend->GetVM()->GetEditor();
+				EngineContext *engine = frontend->GetVM()->GetActiveEngine();
+				if (editor && engine)
+					editor->UpdateFrame(GetClientSize().x, GetClientSize().y, GetContentScaleFactor(), engine->GetSystem()->delta); //update editor frame
+
 				bool result = frontend->Loop(); //run simulator loop
 				if (!result)
 					frontend->Quit();
@@ -236,6 +304,23 @@ void MainScreen::OnActivate(wxActivateEvent &event)
 void MainScreen::OnKeyDown(wxKeyEvent& event)
 {
 	//this function is run when a key is pressed
+
+	if (!frontend->GetVM())
+		return;
+
+	if (frontend->GetVM()->GetEditor()->IsInitialized() == true && frontend->GetVM()->GetHAL()->IsVREnabled() == false)
+	{
+		UpdateImguiModsFromWx(event);
+		ImGuiKey k = ToImGuiKey(event.GetKeyCode());
+		if (k != ImGuiKey_None)
+		{
+			if (ImGui::GetIO().WantCaptureKeyboard)
+				event.Skip(false);
+			ImGui::GetIO().AddKeyEvent(k, true);
+		}
+		else
+			event.Skip();
+	}
 
 	EngineContext *engine = frontend->GetVM()->GetActiveEngine();
 
@@ -418,6 +503,13 @@ void MainScreen::OnKeyDown(wxKeyEvent& event)
 			camera->SetFOVAngle(angle);
 		}
 
+		//editor window
+		if (key == (wxKeyCode)'=')
+		{
+			Editor *editor = frontend->GetVM()->GetEditor();
+			editor->Enable(!editor->IsEnabled());
+		}
+
 		//model pick-up
 		if (key == (wxKeyCode)key_pickup)
 		{
@@ -492,6 +584,23 @@ void MainScreen::OnKeyDown(wxKeyEvent& event)
 void MainScreen::OnKeyUp(wxKeyEvent& event)
 {
 	//this function is run when a key is released
+
+	if (!frontend->GetVM())
+		return;
+
+	if (frontend->GetVM()->GetEditor()->IsInitialized() == true && frontend->GetVM()->GetHAL()->IsVREnabled() == false)
+	{
+		UpdateImguiModsFromWx(event);
+		ImGuiKey k = ToImGuiKey(event.GetKeyCode());
+		if (k != ImGuiKey_None)
+		{
+			if (ImGui::GetIO().WantCaptureKeyboard)
+				event.Skip(false);
+			ImGui::GetIO().AddKeyEvent(k, false);
+		}
+			else
+				event.Skip();
+	}
 
 	EngineContext *engine = frontend->GetVM()->GetActiveEngine();
 
@@ -676,6 +785,48 @@ void MainScreen::OnMouseButton(wxMouseEvent& event)
 {
 	//this function is run when a mouse button is pressed
 
+	if (!frontend->GetVM())
+		return;
+
+	if (frontend->GetVM()->GetEditor()->IsInitialized() == true && frontend->GetVM()->GetHAL()->IsVREnabled() == false)
+	{
+		ImGuiIO& io = ImGui::GetIO();
+		if (io.WantCaptureMouse)
+			event.Skip(false);
+
+		//use separate handlers if you prefer; this works for down/up/dclick paths:
+		int btn = 0;
+		bool down = event.ButtonDown(wxMOUSE_BTN_LEFT) || event.ButtonDClick(wxMOUSE_BTN_LEFT);
+		bool up   = event.ButtonUp(wxMOUSE_BTN_LEFT);
+		if (!(down || up))
+		{
+			if (event.ButtonDown(wxMOUSE_BTN_RIGHT) || event.ButtonDClick(wxMOUSE_BTN_RIGHT))
+			{
+				btn = 1;
+				down = true;
+			}
+			else if (event.ButtonUp(wxMOUSE_BTN_RIGHT))
+			{
+				btn = 1;
+				up = true;
+			}
+			else if (event.ButtonDown(wxMOUSE_BTN_MIDDLE) || event.ButtonDClick(wxMOUSE_BTN_MIDDLE))
+			{
+				btn = 2;
+				down = true;
+			}
+			else if (event.ButtonUp(wxMOUSE_BTN_MIDDLE))
+			{
+				btn = 2;
+				up = true;
+			}
+		}
+		if (down)
+			io.AddMouseButtonEvent(btn, true);
+		if (up)
+			io.AddMouseButtonEvent(btn, false);
+	}
+
 	//enter or exit freelook mode using mouse scroll wheel
 	if (event.GetWheelRotation() > 0)
 	{
@@ -752,6 +903,8 @@ void MainScreen::HandleMouseMovement()
 			//reset values to prevent movement from getting stuck
 			frontend->turn_right = 0;
 			frontend->turn_left = 0;
+
+			EnableFreelook(true);
 		}
 
 		frontend->freelook = true;
@@ -844,6 +997,9 @@ void MainScreen::EnableFreelook(bool value)
 #ifndef __FreeBSD__
 void MainScreen::OnJoystickEvent(wxJoystickEvent &event)
 {
+	if (!frontend->GetVM())
+		return;
+
 	if (event.IsZMove())
 		return;
 
@@ -875,27 +1031,28 @@ void MainScreen::OnJoystickEvent(wxJoystickEvent &event)
 
 	int CenterX = (MaxX + MinX) / 2;
 	int CenterY = (MaxY + MinY) / 2;
+	int range = (MaxX - MinX) / 8;
 
 	if (joystick->GetButtonState(joy_fast))
 		speed = speed_fast;
 
-	if (joystick->GetPosition(joy_forward) < CenterY)
+	if (joystick->GetPosition(joy_forward) < (CenterY - range))
 		step += speed;
-	if (joystick->GetPosition(joy_forward) > CenterY)
+	if (joystick->GetPosition(joy_forward) > (CenterY + range))
 		step -= speed;
 
 	if (joystick->GetButtonState(joy_strafe))
 	{
-		if (joystick->GetPosition(joy_turn) > CenterX)
+		if (joystick->GetPosition(joy_turn) > (CenterX + range))
 			strafe += speed;
-		if (joystick->GetPosition(joy_turn) < CenterX)
+		if (joystick->GetPosition(joy_turn) < (CenterX - range))
 			strafe -= speed;
 	}
 	else
 	{
-		if (joystick->GetPosition(joy_turn) > CenterX)
+		if (joystick->GetPosition(joy_turn) > (CenterX + range))
 			turn += speed;
-		if (joystick->GetPosition(joy_turn) < CenterX)
+		if (joystick->GetPosition(joy_turn) < (CenterX - range))
 			turn -= speed;
 	}
 
@@ -905,8 +1062,81 @@ void MainScreen::OnJoystickEvent(wxJoystickEvent &event)
 
 	if (joystick->GetButtonState(joy_click))
 		engine->GetVM()->GetHAL()->ClickedObject(true, false, false, false, false, 0.0, true);
+
+	if (joystick->GetButtonState(joy_jump) && camera->IsOnGround() == true)
+		camera->Jump();
 }
 #endif
+
+void MainScreen::OnMouseMove(wxMouseEvent &event)
+{
+	if (!frontend->GetVM())
+		return;
+
+	if (frontend->GetVM()->GetEditor()->IsInitialized() == true && frontend->GetVM()->GetHAL()->IsVREnabled() == false)
+	{
+		if (ImGui::GetIO().WantCaptureMouse)
+			event.Skip(false);
+		auto p = event.GetPosition();
+		ImGui::GetIO().AddMousePosEvent((float)p.x, (float)p.y);
+	}
+}
+
+void MainScreen::OnMouseLeave(wxMouseEvent &event)
+{
+	if (!frontend->GetVM())
+		return;
+
+	if (frontend->GetVM()->GetEditor()->IsInitialized() == true && frontend->GetVM()->GetHAL()->IsVREnabled() == false)
+	{
+		ImGui::GetIO().AddMousePosEvent(-FLT_MAX, -FLT_MAX);
+		event.Skip();
+	}
+}
+
+void MainScreen::OnChar(wxKeyEvent &event)
+{
+	if (!frontend->GetVM())
+		return;
+
+	if (frontend->GetVM()->GetEditor()->IsInitialized() == true && frontend->GetVM()->GetHAL()->IsVREnabled() == false)
+	{
+		const int uni = event.GetUnicodeKey();
+		if (uni > 0 && uni != WXK_NONE && uni != WXK_DELETE)
+		{
+			if (ImGui::GetIO().WantTextInput)
+				event.Skip(false);
+			ImGui::GetIO().AddInputCharacter((unsigned int)uni);
+			return;
+		}
+		event.Skip();
+	}
+}
+
+void MainScreen::OnFocus(wxFocusEvent &event)
+{
+	if (!frontend->GetVM())
+		return;
+
+	if (frontend->GetVM()->GetEditor()->IsInitialized() == true && frontend->GetVM()->GetHAL()->IsVREnabled() == false)
+	{
+		ImGui::GetIO().AddFocusEvent(true);
+		event.Skip();
+	}
+}
+
+void MainScreen::OnKillFocus(wxFocusEvent &event)
+{
+	if (!frontend->GetVM())
+		return;
+
+	if (frontend->GetVM()->GetEditor()->IsInitialized() == true && frontend->GetVM()->GetHAL()->IsVREnabled() == false)
+	{
+		ImGui::GetIO().AddFocusEvent(false);
+		event.Skip();
+
+	}
+}
 
 }
 

@@ -26,7 +26,7 @@
 //*)
 #include "globals.h"
 #include "sbs.h"
-#include "texture.h"
+#include "polymesh.h"
 #include "vm.h"
 #include "hal.h"
 #include "debugpanel.h"
@@ -87,7 +87,10 @@ const long Stats::ID_STATICTEXT26 = wxNewId();
 const long Stats::ID_tPlatform = wxNewId();
 const long Stats::ID_STATICTEXT2 = wxNewId();
 const long Stats::ID_tRenderer = wxNewId();
+const long Stats::ID_STATICTEXT19 = wxNewId();
+const long Stats::ID_tGPU = wxNewId();
 const long Stats::ID_bOK = wxNewId();
+const long Stats::ID_chkGlobal = wxNewId();
 //*)
 
 BEGIN_EVENT_TABLE(Stats,wxDialog)
@@ -98,6 +101,7 @@ END_EVENT_TABLE()
 Stats::Stats(DebugPanel* parent,wxWindowID id)
 {
 	//(*Initialize(Stats)
+	wxBoxSizer* BoxSizer1;
 	wxFlexGridSizer* FlexGridSizer1;
 	wxFlexGridSizer* FlexGridSizer2;
 	wxFlexGridSizer* FlexGridSizer3;
@@ -219,13 +223,21 @@ Stats::Stats(DebugPanel* parent,wxWindowID id)
 	FlexGridSizer2->Add(StaticText2, 1, wxLEFT|wxALIGN_LEFT|wxALIGN_CENTER_VERTICAL, 5);
 	tRenderer = new wxTextCtrl(this, ID_tRenderer, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_READONLY|wxTE_CENTRE, wxDefaultValidator, _T("ID_tRenderer"));
 	FlexGridSizer2->Add(tRenderer, 1, wxLEFT|wxEXPAND, 5);
+	StaticText19 = new wxStaticText(this, ID_STATICTEXT19, _("GPU Device:"), wxDefaultPosition, wxDefaultSize, 0, _T("ID_STATICTEXT19"));
+	FlexGridSizer2->Add(StaticText19, 1, wxLEFT|wxALIGN_LEFT|wxALIGN_CENTER_VERTICAL, 5);
+	tGPU = new wxTextCtrl(this, ID_tGPU, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_READONLY|wxTE_CENTRE, wxDefaultValidator, _T("ID_tGPU"));
+	FlexGridSizer2->Add(tGPU, 1, wxLEFT|wxEXPAND, 5);
 	StaticBoxSizer1->Add(FlexGridSizer2, 1, wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5);
 	FlexGridSizer4->Add(StaticBoxSizer1, 1, wxALL|wxALIGN_TOP|wxALIGN_CENTER_HORIZONTAL, 5);
 	FlexGridSizer1->Add(FlexGridSizer4, 1, wxALL|wxALIGN_LEFT|wxALIGN_TOP, 5);
+	BoxSizer1 = new wxBoxSizer(wxHORIZONTAL);
 	bOK = new wxButton(this, ID_bOK, _("OK"), wxDefaultPosition, wxDefaultSize, 0, wxDefaultValidator, _T("ID_bOK"));
-	FlexGridSizer1->Add(bOK, 1, wxBOTTOM|wxLEFT|wxRIGHT|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5);
+	BoxSizer1->Add(bOK, 1, wxBOTTOM|wxLEFT|wxRIGHT|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5);
+	chkGlobal = new wxCheckBox(this, ID_chkGlobal, _("Global Stats"), wxDefaultPosition, wxDefaultSize, 0, wxDefaultValidator, _T("ID_chkGlobal"));
+	chkGlobal->SetValue(false);
+	BoxSizer1->Add(chkGlobal, 1, wxBOTTOM|wxLEFT|wxRIGHT|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5);
+	FlexGridSizer1->Add(BoxSizer1, 1, wxALL|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5);
 	SetSizer(FlexGridSizer1);
-	FlexGridSizer1->Fit(this);
 	FlexGridSizer1->SetSizeHints(this);
 	Center();
 
@@ -252,10 +264,11 @@ void Stats::OnInit()
 {
 	Simcore = panel->GetSystem();
 
-	tFrontendVersion->SetValue(panel->GetRoot()->version_frontend);
+	tFrontendVersion->SetValue(panel->GetRoot()->version_full);
 	tSBSVersion->SetValue(Simcore->version);
 	tPlatform->SetValue(panel->GetRoot()->Platform);
 	tRenderer->SetValue(panel->GetRoot()->GetHAL()->Renderer);
+	tGPU->SetValue(panel->GetRoot()->GetHAL()->GPUDevice);
 
 	tName->SetValue(Simcore->BuildingName);
 	tDesigner->SetValue(Simcore->BuildingDesigner);
@@ -273,22 +286,41 @@ void Stats::Loop()
 	if (!Simcore)
 		return;
 
-	tMeshes->SetValue(ToString(Simcore->GetMeshCount()));
-	tTextures->SetValue(ToString(Simcore->GetTextureManager()->GetMaterialCount()));
-	tActions->SetValue(ToString(Simcore->GetActionCount()));
-	tSounds->SetValue(ToString(Simcore->GetSoundCount()));
-	tInStairwell->SetValue(BoolToString(Simcore->InStairwell));
-	tInElevator->SetValue(BoolToString(Simcore->InElevator));
-	tInShaft->SetValue(BoolToString(Simcore->InShaft));
-	tRunningTime->SetValue(TruncateNumber(Simcore->running_time, 2));
-	tObjects->SetValue(ToString(Simcore->GetObjectCount()));
-	tWalls->SetValue(ToString(Simcore->GetWallCount()));
-	tPolygons->SetValue(ToString(Simcore->GetPolygonCount()));
-	tFloors->SetValue(ToString(Simcore->Floors));
-	tBasements->SetValue(ToString(Simcore->Basements));
-	tElevators->SetValue(ToString(Simcore->GetElevatorCount()));
-	tShafts->SetValue(ToString(Simcore->GetShaftCount()));
-	tStairs->SetValue(ToString(Simcore->GetStairwellCount()));
+	if (chkGlobal->GetValue() == false)
+	{
+		//per-engine stats
+		tMeshes->SetValue(ToString(Simcore->GetMeshCount()));
+		tTextures->SetValue(ToString(Simcore->GetTextureCount()));
+		tActions->SetValue(ToString(Simcore->GetActionCount()));
+		tSounds->SetValue(ToString(Simcore->GetSoundCount()));
+		tInStairwell->SetValue(BoolToString(Simcore->InStairwell));
+		tInElevator->SetValue(BoolToString(Simcore->InElevator));
+		tInShaft->SetValue(BoolToString(Simcore->InShaft));
+		tRunningTime->SetValue(TruncateNumber(Simcore->running_time, 2));
+		tObjects->SetValue(ToString(Simcore->GetObjectCount()));
+		tWalls->SetValue(ToString(Simcore->GetPolyMesh()->GetWallCount()));
+		tPolygons->SetValue(ToString(Simcore->GetPolyMesh()->GetPolygonCount()));
+		tFloors->SetValue(ToString(Simcore->Floors));
+		tBasements->SetValue(ToString(Simcore->Basements));
+		tElevators->SetValue(ToString(Simcore->GetElevatorCount()));
+		tShafts->SetValue(ToString(Simcore->GetShaftCount()));
+		tStairs->SetValue(ToString(Simcore->GetStairwellCount()));
+	}
+	else
+	{
+		//global stats
+		tRunningTime->SetValue(ToString(panel->GetRoot()->Uptime() / 1000));
+
+		unsigned long meshes, textures, actions, sounds, objects, walls, polygons;
+		unsigned long total = panel->GetRoot()->GetGlobalStats(meshes, textures, actions, sounds, objects, walls, polygons);
+		tMeshes->SetValue(ToString(meshes));
+		tTextures->SetValue(ToString(textures));
+		tActions->SetValue(ToString(actions));
+		tSounds->SetValue(ToString(sounds));
+		tObjects->SetValue(ToString(objects));
+		tWalls->SetValue(ToString(walls));
+		tPolygons->SetValue(ToString(polygons));
+	}
 }
 
 }

@@ -30,7 +30,7 @@ class ScriptProcessor::Section
 friend class ScriptProcessor;
 
 public:
-	Section(ScriptProcessor* parent);
+	explicit Section(ScriptProcessor* parent);
 	virtual ~Section() {}
 	virtual void Reset() {}
 	virtual int Run(std::string &LineData) { return 0; }
@@ -60,6 +60,20 @@ protected:
 	std::string Calc(const std::string &expression);
 };
 
+enum SectionType
+{
+	SECTION_NONE = 0,
+	SECTION_GLOBAL = 1,
+	SECTION_FLOOR = 2,
+	SECTION_BUILDINGS = 3,
+	SECTION_ELEVATOR = 4,
+	SECTION_TEXTURE = 5,
+	SECTION_ELEVATORCAR = 6,
+	SECTION_VEHICLE = 7,
+	SECTION_CONTROLLER = 8,
+	SECTION_CALLSTATION = 9
+};
+
 class ScriptProcessor::ConfigHandler
 {
 public:
@@ -77,53 +91,58 @@ public:
 	int RangeH, RangeHOld;
 	long RangeStart, RangeStartOld;
 	int Current, CurrentOld; //current range iteration
-	int SectionNum; //current section number
+	SectionType SectionNum; //current section number
 	std::string Context, ContextOld; //section context
 	bool ReverseAxis;
 	bool InWhile;
 	bool setshaftdoors;
 	bool CheckScript; //if true, quick-checks script execution, and exits
+	std::string extrusion_texture; //side texture used for polygon extrusion
+	Real extrusion_thickness; //polygon extrusion thickness
+	Real extrusion_tw; //extrusion side texture tiling width
+	Real extrusion_th; //extrusion side texture tiling height
+	bool extrude;
 };
 
 class ScriptProcessor::GlobalsSection : public ScriptProcessor::Section
 {
 public:
-	GlobalsSection(ScriptProcessor* parent);
-	~GlobalsSection() {}
-	int Run(std::string &LineData);
+	explicit GlobalsSection(ScriptProcessor* parent);
+	~GlobalsSection() override {}
+	int Run(std::string &LineData) override;
 };
 
 class ScriptProcessor::BuildingsSection : public ScriptProcessor::Section
 {
 public:
-	BuildingsSection(ScriptProcessor* parent);
-	~BuildingsSection() {}
-	int Run(std::string &LineData);
+	explicit BuildingsSection(ScriptProcessor* parent);
+	~BuildingsSection() override {}
+	int Run(std::string &LineData) override;
 };
 
 class ScriptProcessor::TexturesSection : public ScriptProcessor::Section
 {
 public:
-	TexturesSection(ScriptProcessor* parent);
-	~TexturesSection() {}
-	int Run(std::string &LineData);
+	explicit TexturesSection(ScriptProcessor* parent);
+	~TexturesSection() override {}
+	int Run(std::string &LineData) override;
 };
 
 class ScriptProcessor::CommandsSection : public ScriptProcessor::Section
 {
 public:
-	CommandsSection(ScriptProcessor* parent);
-	~CommandsSection() {}
-	int Run(std::string &LineData);
+	explicit CommandsSection(ScriptProcessor* parent);
+	~CommandsSection() override {}
+	int Run(std::string &LineData) override;
 };
 
 class ScriptProcessor::FloorSection : public ScriptProcessor::Section
 {
 public:
-	FloorSection(ScriptProcessor* parent);
-	~FloorSection() {}
-	void Reset();
-	int Run(std::string &LineData);
+	explicit FloorSection(ScriptProcessor* parent);
+	~FloorSection() override {}
+	void Reset() override;
+	int Run(std::string &LineData) override;
 
 private:
 	int FloorCheck;
@@ -145,41 +164,41 @@ private:
 class ScriptProcessor::ElevatorSection : public ScriptProcessor::Section
 {
 public:
-	ElevatorSection(ScriptProcessor* parent);
-	~ElevatorSection() {}
-	int Run(std::string &LineData);
+	explicit ElevatorSection(ScriptProcessor* parent);
+	~ElevatorSection() override {}
+	int Run(std::string &LineData) override;
 };
 
 class ScriptProcessor::ElevatorCarSection : public ScriptProcessor::Section
 {
 public:
-	ElevatorCarSection(ScriptProcessor* parent);
-	~ElevatorCarSection() {}
-	int Run(std::string &LineData);
+	explicit ElevatorCarSection(ScriptProcessor* parent);
+	~ElevatorCarSection() override {}
+	int Run(std::string &LineData) override;
 };
 
 class ScriptProcessor::VehicleSection : public ScriptProcessor::Section
 {
 public:
-	VehicleSection(ScriptProcessor* parent);
-	~VehicleSection() {}
-	int Run(std::string &LineData);
+	explicit VehicleSection(ScriptProcessor* parent);
+	~VehicleSection() override {}
+	int Run(std::string &LineData) override;
 };
 
 class ScriptProcessor::ControllerSection : public ScriptProcessor::Section
 {
 public:
-	ControllerSection(ScriptProcessor* parent);
-	~ControllerSection() {}
-	int Run(std::string &LineData);
+	explicit ControllerSection(ScriptProcessor* parent);
+	~ControllerSection() override {}
+	int Run(std::string &LineData) override;
 };
 
 class ScriptProcessor::CallStationSection : public ScriptProcessor::Section
 {
 public:
-	CallStationSection(ScriptProcessor* parent);
-	~CallStationSection() {}
-	int Run(std::string &LineData);
+	explicit CallStationSection(ScriptProcessor* parent);
+	~CallStationSection() override {}
+	int Run(std::string &LineData) override;
 };
 
 }

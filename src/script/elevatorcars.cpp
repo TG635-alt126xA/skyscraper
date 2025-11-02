@@ -56,7 +56,7 @@ int ScriptProcessor::ElevatorCarSection::Run(std::string &LineData)
 	//get car object
 	ElevatorCar *car = 0;
 	Elevator *elev = 0;
-	if (config->SectionNum == 6)
+	if (config->SectionNum == SECTION_ELEVATORCAR)
 	{
 		elev = Simcore->GetElevator(config->CurrentOld);
 		if (elev)
@@ -81,7 +81,7 @@ int ScriptProcessor::ElevatorCarSection::Run(std::string &LineData)
 		return sError;
 
 	//replace variables with actual values
-	if (config->SectionNum == 6) //only run if not being called from elevator function
+	if (config->SectionNum == SECTION_ELEVATORCAR) //only run if not being called from elevator function
 	{
 		ReplaceAll(LineData, "%elevator%", ToString(config->CurrentOld));
 		ReplaceAll(LineData, "%car%", ToString(config->Current));
@@ -1178,7 +1178,7 @@ int ScriptProcessor::ElevatorCarSection::Run(std::string &LineData)
 		//get data
 		int params = SplitData(LineData, 14);
 
-		if (params < 7 || params > 9)
+		if (params < 7 || params > 10)
 			return ScriptError("Incorrect number of parameters");
 
 		int compat = 0;
@@ -1227,12 +1227,14 @@ int ScriptProcessor::ElevatorCarSection::Run(std::string &LineData)
 			return sNextLine;
 
 		bool result;
-		if (compat == 0)
-			result = car->AddShaftDoors(ToInt(tempdata[0]), tempdata[1], tempdata[2], ToFloat(tempdata[3]), ToFloat(tempdata[4]), ToFloat(tempdata[5]), ToFloat(tempdata[6]), ToFloat(tempdata[7]), ToFloat(tempdata[8]));
-		if (compat == 1)
-			result = car->AddShaftDoors(ToInt(tempdata[0]), tempdata[1], tempdata[1], ToFloat(tempdata[2]), ToFloat(tempdata[3]), ToFloat(tempdata[4]), 0, ToFloat(tempdata[5]), ToFloat(tempdata[6]));
-		if (compat == 2)
-			result = car->AddShaftDoors(ToInt(tempdata[0]), tempdata[1], tempdata[2], ToFloat(tempdata[3]), ToFloat(tempdata[4]), ToFloat(tempdata[5]), 0, ToFloat(tempdata[6]), ToFloat(tempdata[7]));
+		if (compat == 0 && params == 9)
+			result = car->AddShaftDoors(ToInt(tempdata[0]), 0.0, tempdata[1], tempdata[2], ToFloat(tempdata[3]), ToFloat(tempdata[4]), ToFloat(tempdata[5]), ToFloat(tempdata[6]), ToFloat(tempdata[7]), ToFloat(tempdata[8]));
+		else if (compat == 0 && params == 10)
+			result = car->AddShaftDoors(ToInt(tempdata[0]), ToFloat(tempdata[9]), tempdata[1], tempdata[2], ToFloat(tempdata[3]), ToFloat(tempdata[4]), ToFloat(tempdata[5]), ToFloat(tempdata[6]), ToFloat(tempdata[7]), ToFloat(tempdata[8]));
+		else if (compat == 1)
+			result = car->AddShaftDoors(ToInt(tempdata[0]), 0.0, tempdata[1], tempdata[1], ToFloat(tempdata[2]), ToFloat(tempdata[3]), ToFloat(tempdata[4]), 0, ToFloat(tempdata[5]), ToFloat(tempdata[6]));
+		else if (compat == 2)
+			result = car->AddShaftDoors(ToInt(tempdata[0]), 0.0, tempdata[1], tempdata[2], ToFloat(tempdata[3]), ToFloat(tempdata[4]), ToFloat(tempdata[5]), 0, ToFloat(tempdata[6]), ToFloat(tempdata[7]));
 
 		if (result == false)
 			return ScriptError();
@@ -2168,6 +2170,9 @@ int ScriptProcessor::ElevatorCarSection::Run(std::string &LineData)
 	//AddModel command
 	if (StartsWithNoCase(LineData, "addmodel"))
 	{
+		if (parent->NoModels == true)
+			return sNextLine;
+
 		//get data
 		int params = SplitData(LineData, 9);
 
@@ -2378,7 +2383,7 @@ int ScriptProcessor::ElevatorCarSection::Run(std::string &LineData)
 	if (StartsWithNoCase(LineData, "<endcar>") == true && config->RangeL == config->RangeH)
 	{
 		//return to elevator section
-		config->SectionNum = 4;
+		config->SectionNum = SECTION_ELEVATOR;
 		config->Context = config->ContextOld;
 		config->Current = config->CurrentOld;
 		config->RangeL = config->RangeLOld;
@@ -2401,7 +2406,7 @@ int ScriptProcessor::ElevatorCarSection::Run(std::string &LineData)
 		}
 		else
 		{
-			config->SectionNum = 4; //break out of loop
+			config->SectionNum = SECTION_ELEVATOR; //break out of loop
 			config->Context = config->ContextOld;
 			config->RangeL = config->RangeLOld;
 			config->RangeH = config->RangeHOld;

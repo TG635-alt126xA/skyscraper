@@ -38,6 +38,7 @@ namespace Ogre {
 	class Rectangle2D;
 	class ConfigFile;
 	class OverlaySystem;
+	class ImGuiOverlay;
 }
 
 namespace FMOD {
@@ -51,7 +52,7 @@ namespace Skyscraper {
 class VMIMPEXP HAL : public Ogre::LogListener
 {
 public:
-    HAL(VM *vm);
+	explicit HAL(VM *vm);
     ~HAL();
 	bool Initialize(const std::string &data_path, Ogre::Root *root = 0, Ogre::OverlaySystem *overlay = 0);
 	bool Render();
@@ -61,7 +62,7 @@ public:
 	std::string GetConfigString(Ogre::ConfigFile *file, const std::string &key, const std::string &default_value);
 	bool GetConfigBool(Ogre::ConfigFile *file, const std::string &key, bool default_value);
 	Real GetConfigFloat(Ogre::ConfigFile *file, const std::string &key, Real default_value);
-	bool PlaySound(const std::string &filename);
+	bool PlaySound(const std::string &filename, Real volume = 1.0);
 	void StopSound();
 	void ClearScene();
 	void ToggleStats();
@@ -78,19 +79,22 @@ public:
 	void Report(const std::string &message, const std::string &prompt);
 	bool ReportError(const std::string &message, const std::string &prompt);
 	bool ReportFatalError(const std::string &message, const std::string &prompt);
-	void LoadConfiguration(const std::string data_path, bool show_console);
+	void LoadConfiguration(const std::string &data_path, bool show_console);
 	bool LoadSystem(const std::string &data_path, Ogre::RenderWindow *renderwindow);
 	void ConsoleOut(const std::string &message, const std::string &color = "white");
 	std::string GetColors(const std::string &color);
 	unsigned long GetCurrentTime();
+	bool IsVREnabled();
 
 	bool RTSS;
 	std::string Renderer;
+	std::string GPUDevice;
 	bool DisableSound;
 	std::vector<Ogre::Camera*> mCameras;
 	Ogre::Root* mRoot;
 	Ogre::RenderWindow* mRenderWindow;
 	std::vector<Ogre::Viewport*> mViewports;
+	bool DX11;
 
 	//config files
 	Ogre::ConfigFile *configfile;

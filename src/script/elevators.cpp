@@ -24,6 +24,7 @@
 #include "sbs.h"
 #include "enginecontext.h"
 #include "elevator.h"
+#include "elevroute.h"
 #include "wall.h"
 #include "scriptproc.h"
 #include "section.h"
@@ -356,7 +357,7 @@ int ScriptProcessor::ElevatorSection::Run(std::string &LineData)
 	{
 		if (equals == false)
 			return ScriptError("Syntax error");
-		elev->QueueResets = ToBool(value);
+		elev->GetRouteController()->QueueResets = ToBool(value);
 		return sNextLine;
 	}
 	//LimitQueue parameter
@@ -364,7 +365,7 @@ int ScriptProcessor::ElevatorSection::Run(std::string &LineData)
 	{
 		if (equals == false)
 			return ScriptError("Syntax error");
-		elev->LimitQueue = ToBool(value);
+		elev->GetRouteController()->LimitQueue = ToBool(value);
 		return sNextLine;
 	}
 	//ACP parameter
@@ -751,7 +752,7 @@ int ScriptProcessor::ElevatorSection::Run(std::string &LineData)
 	//handle end of elevator section
 	if (StartsWithNoCase(LineData, "<endelevator>") && config->RangeL == config->RangeH)
 	{
-		config->SectionNum = 0;
+		config->SectionNum = SECTION_NONE;
 		config->Context = "None";
 		if (parent->InRunloop() == false)
 			engine->Report("Finished elevator");
@@ -769,7 +770,7 @@ int ScriptProcessor::ElevatorSection::Run(std::string &LineData)
 		}
 		else
 		{
-			config->SectionNum = 0; //break out of loop
+			config->SectionNum = SECTION_NONE; //break out of loop
 			config->Context = "None";
 			config->RangeL = 0;
 			config->RangeH = 0;

@@ -25,6 +25,7 @@
 
 //(*Headers(Stats)
 #include <wx/button.h>
+#include <wx/checkbox.h>
 #include <wx/dialog.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
@@ -42,6 +43,7 @@ class Stats: public wxDialog
 
 		//(*Declarations(Stats)
 		wxButton* bOK;
+		wxCheckBox* chkGlobal;
 		wxStaticText* StaticText10;
 		wxStaticText* StaticText11;
 		wxStaticText* StaticText12;
@@ -51,6 +53,7 @@ class Stats: public wxDialog
 		wxStaticText* StaticText16;
 		wxStaticText* StaticText17;
 		wxStaticText* StaticText18;
+		wxStaticText* StaticText19;
 		wxStaticText* StaticText1;
 		wxStaticText* StaticText20;
 		wxStaticText* StaticText21;
@@ -74,6 +77,7 @@ class Stats: public wxDialog
 		wxTextCtrl* tElevators;
 		wxTextCtrl* tFloors;
 		wxTextCtrl* tFrontendVersion;
+		wxTextCtrl* tGPU;
 		wxTextCtrl* tInElevator;
 		wxTextCtrl* tInShaft;
 		wxTextCtrl* tInStairwell;
@@ -148,7 +152,10 @@ class Stats: public wxDialog
 		static const long ID_tPlatform;
 		static const long ID_STATICTEXT2;
 		static const long ID_tRenderer;
+		static const long ID_STATICTEXT19;
+		static const long ID_tGPU;
 		static const long ID_bOK;
+		static const long ID_chkGlobal;
 		//*)
 		void OnInit();
 

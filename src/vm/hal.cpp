@@ -37,10 +37,7 @@
 #endif
 
 //OpenXR interfaces
-#if OGRE_PLATFORM == OGRE_PLATFORM_WIN32
-#include "OgreOpenXRRenderWindow.h"
-#endif
-#if OGRE_PLATFORM == OGRE_PLATFORM_WIN32
+#if USING_OPENXR
 #include "OgreOpenXRRenderWindow.h"
 #endif
 
@@ -60,6 +57,7 @@
 #include "enginecontext.h"
 #include "hal.h"
 #include "gui.h"
+#include "editor.h"
 #include "profiler.h"
 
 using namespace SBS;
@@ -87,6 +85,7 @@ HAL::HAL(VM *vm)
 	configfile = 0;
 	keyconfigfile = 0;
 	joyconfigfile = 0;
+	DX11 = false;
 	timer = new Ogre::Timer();
 }
 
@@ -172,6 +171,8 @@ void HAL::ClickedObject(bool left, bool shift, bool ctrl, bool alt, bool right, 
 
 void HAL::UnclickedObject()
 {
+	//unclick the clicked object
+
 	EngineContext *engine = vm->GetActiveEngine();
 
 	if (!engine)
@@ -190,7 +191,7 @@ void HAL::UnclickedObject()
 
 void HAL::UpdateOpenXR()
 {
-#if OGRE_PLATFORM == OGRE_PLATFORM_WIN32
+#if USING_OPENXR
 	SBS_PROFILE_MAIN("UpdateOpenXR");
 
 	//update OpenXR camera transformations
@@ -209,6 +210,41 @@ void HAL::UpdateOpenXR()
 					Ogre::Camera* camera = Simcore->camera->GetOgreCamera(i);
 					Vector3 cameranode_pos = Simcore->camera->GetSceneNode()->GetPosition() - Simcore->camera->GetPosition();
 					SetOpenXRParameters(i, Simcore->ToRemote(cameranode_pos), camera->getDerivedOrientation());
+				}
+
+				//update controllers
+
+				//left controller for movement
+				OpenXRControllerState leftState;
+				if (GetControllerState(0, &leftState))
+				{
+					//std::string out = "Thumbstick: (" + ToString(leftState.joystickX) + ", " + ToString(leftState.joystickY) + ")";
+					//Report(out);
+					const float deadzone = 0.1f;
+					float x = leftState.joystickX;
+					float y = leftState.joystickY;
+
+					if (std::abs(x) > deadzone || std::abs(y) > deadzone) {
+						Ogre::Vector3 localMove(x, 0, -y);
+
+						Ogre::Quaternion viewRot = Simcore->camera->GetOrientation();
+						Ogre::Vector3 worldMove = viewRot * localMove;
+
+						float walkSpeed = 3.0f; // units per second
+						worldMove *= walkSpeed * Simcore->delta;
+
+						Ogre::Vector3 currentPos = Simcore->camera->GetPosition();
+						Simcore->camera->SetPosition(currentPos + worldMove);
+					}
+				}
+
+				//right controller for rotation
+				OpenXRControllerState rightState;
+				if (GetControllerState(0, &rightState))
+				{
+					float turnRate = 1.0;
+					float yawChange = rightState.joystickX * turnRate * Simcore->delta;
+					Simcore->camera->Turn(yawChange);
 				}
 			}
 		}
@@ -342,7 +378,7 @@ bool HAL::Initialize(const std::string &data_path, Ogre::Root *root, Ogre::Overl
 			}
 
 			//report on system startup
-			Report("Skyscraper version " + vm->version_frontend + " starting...\n", "");
+			Report("Skyscraper version " + vm->version_full + " starting...\n", "");
 
 			//load OGRE
 			Report("Loading OGRE...");
@@ -439,14 +475,20 @@ bool HAL::LoadSystem(const std::string &data_path, Ogre::RenderWindow *renderwin
 {
 	//load HAL system resources
 
+	if (!renderwindow)
+		return false;
+
 	mRenderWindow = renderwindow;
 
 	//get renderer info
 	Renderer = mRoot->getRenderSystem()->getCapabilities()->getRenderSystemName();
 
 	//shorten name
-	int loc = Renderer.find("Rendering Subsystem");
+	size_t loc = Renderer.find("Rendering Subsystem");
 	Renderer = Renderer.substr(0, loc - 1);
+
+	//get graphics card device information
+	GPUDevice = mRoot->getRenderSystem()->getCapabilities()->getDeviceName();
 
 	//load resource configuration
 	Ogre::ConfigFile cf;
@@ -542,6 +584,9 @@ bool HAL::LoadSystem(const std::string &data_path, Ogre::RenderWindow *renderwin
 		}
 	}
 
+	if (renderer == "Direct3D11 Rendering Subsystem")
+		DX11 = true;
+
 	try
 	{
 		//define camera configuration
@@ -554,7 +599,9 @@ bool HAL::LoadSystem(const std::string &data_path, Ogre::RenderWindow *renderwin
 			mCameras.emplace_back(mSceneMgr->createCamera("Camera " + ToString(i + 1)));
 			if (mRenderWindow)
 			{
-				mViewports.emplace_back(mRenderWindow->addViewport(mCameras[i], (cameras - 1) - i, 0, 0, 1, 1));
+				Ogre::Viewport* viewport = mRenderWindow->addViewport(mCameras[i], (cameras - 1) - i, 0, 0, 1, 1);
+				viewport->setOverlaysEnabled(true);
+				mViewports.emplace_back(viewport);
 				mCameras[i]->setAspectRatio(Real(mViewports[i]->getActualWidth()) / Real(mViewports[i]->getActualHeight()));
 			}
 		}
@@ -583,10 +630,8 @@ bool HAL::LoadSystem(const std::string &data_path, Ogre::RenderWindow *renderwin
 	if (filtermode < 3)
 		maxanisotropy = 1;
 
-	Ogre::TextureFilterOptions filter;
-	if (filtermode == 0)
-		filter = Ogre::TFO_NONE;
-	else if (filtermode == 1)
+	Ogre::TextureFilterOptions filter = Ogre::TFO_NONE;
+	if (filtermode == 1)
 		filter = Ogre::TFO_BILINEAR;
 	else if (filtermode == 2)
 		filter = Ogre::TFO_TRILINEAR;
@@ -658,6 +703,9 @@ bool HAL::LoadSystem(const std::string &data_path, Ogre::RenderWindow *renderwin
 		mTrayMgr->hideCursor();
 	}
 
+	//initialize editor
+	vm->GetEditor()->Initialize();
+
 	//report hardware concurrency
 	int c = std::thread::hardware_concurrency();
 	Report("Reported hardware concurrency: " + ToString(c) + "\n");
@@ -671,6 +719,9 @@ bool HAL::LoadSystem(const std::string &data_path, Ogre::RenderWindow *renderwin
 bool HAL::Render()
 {
 	SBS_PROFILE_MAIN("Render");
+
+	//process editor
+	vm->GetEditor()->Run();
 
 	//render to the frame buffer
 	try
@@ -690,8 +741,9 @@ bool HAL::Render()
 	return true;
 }
 
-bool HAL::PlaySound(const std::string &filename)
+bool HAL::PlaySound(const std::string &filename, Real volume)
 {
+	//play a sound
 #ifndef DISABLE_SOUND
 
 	//load new sound
@@ -717,7 +769,7 @@ bool HAL::PlaySound(const std::string &filename)
 	}
 
 	channel->setLoopCount(-1);
-	channel->setVolume(1.0);
+	channel->setVolume(volume);
 	channel->setPaused(false);
 
 #endif
@@ -790,6 +842,9 @@ void HAL::ReInit()
 
 	delete mTrayMgr;
 	mTrayMgr = 0;
+
+	//unload editor interface
+	vm->GetEditor()->Unload();
 
 	//reinit overlay system
 	try
@@ -871,6 +926,11 @@ void HAL::Clear()
 	//free unused hardware buffers
 	Ogre::HardwareBufferManager::getSingleton()._freeUnusedBufferCopies();
 
+#ifndef DISABLE_SOUND
+	//reset FMOD reverb
+	soundsys->setReverbProperties(0, 0);
+#endif
+
 	ReInit();
 
 #if OGRE_PLATFORM == OGRE_PLATFORM_LINUX
@@ -891,9 +951,14 @@ Ogre::SceneManager* HAL::GetSceneManager()
 Ogre::RenderWindow* HAL::CreateRenderWindow(const std::string &name, int width, int height, const Ogre::NameValuePairList &params)
 {
 	//create the render window
-#if OGRE_PLATFORM == OGRE_PLATFORM_WIN32
+#if USING_OPENXR
 	if (GetConfigBool(configfile, "Skyscraper.Frontend.VR", false) == true)
 	{
+		if (mRoot->getRenderSystem()->getName() != "Direct3D11 Rendering Subsystem")
+		{
+			ReportFatalError("VR mode requires the DirectX 11 renderer\nDelete ogre.cfg and re-run Skyscraper");
+			return 0;
+		}
 		Ogre::RenderWindow* win2 = Ogre::Root::getSingleton().createRenderWindow(name, width, height, false, &params);
 		mRenderWindow = CreateOpenXRRenderWindow(mRoot->getRenderSystem());
 		mRenderWindow->create(name, width, height, false, &params);
@@ -942,7 +1007,7 @@ bool HAL::ReportFatalError(const std::string &message)
 	return ReportFatalError(message, "hal:");
 }
 
-void HAL::LoadConfiguration(const std::string data_path, bool show_console)
+void HAL::LoadConfiguration(const std::string &data_path, bool show_console)
 {
 	//load configuration files
 
@@ -1011,6 +1076,11 @@ unsigned long HAL::GetCurrentTime()
 {
 	//get current time
 	return timer->getMilliseconds();
+}
+
+bool HAL::IsVREnabled()
+{
+	return GetConfigBool(configfile, "Skyscraper.Frontend.VR", false);
 }
 
 }

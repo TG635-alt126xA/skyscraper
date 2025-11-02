@@ -149,7 +149,8 @@ int ScriptProcessor::BuildingsSection::Run(std::string &LineData)
 			max.z = ToFloat(tempdata[10]);
 		}
 
-		bool result = engine->GetVM()->Load(false, tempdata[0], engine, position, rotation, min, max);
+		Vector3 rot (0, rotation, 0);
+		bool result = engine->GetVM()->Load(engine->IsSystem, false, tempdata[0], engine, position, rot, min, max);
 
 		return sNextLine;
 	}
@@ -157,7 +158,7 @@ int ScriptProcessor::BuildingsSection::Run(std::string &LineData)
 	//handle end of buildings section
 	if (StartsWithNoCase(LineData, "<endbuildings>"))
 	{
-		config->SectionNum = 0;
+		config->SectionNum = SECTION_NONE;
 		config->Context = "None";
 		if (parent->InRunloop() == false)
 			engine->Report("Finished loading other buildings");

@@ -45,7 +45,12 @@ public:
 	void OnActivate(wxActivateEvent & event);
 	void OnKeyDown(wxKeyEvent& event);
 	void OnKeyUp(wxKeyEvent& event);
+	void OnChar(wxKeyEvent& event);
+	void OnFocus(wxFocusEvent& event);
+	void OnKillFocus(wxFocusEvent& event);
 	void OnMouseButton(wxMouseEvent& event);
+	void OnMouseMove(wxMouseEvent& event);
+	void OnMouseLeave(wxMouseEvent& event);
 	void EnableFreelook(bool value);
 #ifndef __FreeBSD__
 	void OnJoystickEvent(wxJoystickEvent& event);
@@ -69,7 +74,7 @@ private:
 #ifndef __FreeBSD__
 	wxJoystick *joystick;
 	int joy_buttons;
-	int joy_click, joy_strafe, joy_fast, joy_turn, joy_forward;
+	int joy_click, joy_strafe, joy_fast, joy_turn, joy_forward, joy_jump;
 #endif
 
 	DECLARE_EVENT_TABLE()

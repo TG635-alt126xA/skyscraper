@@ -162,7 +162,10 @@ std::string ScriptProcessor::Section::GetBeforeEquals(const std::string &string,
 	std::string str2;
 
 	if (loc2 == -1)
-		str2 = str.substr(loc);
+	{
+		if (loc >= 0)
+			str2 = str.substr(loc);
+	}
 	else
 		str2 = str.substr(loc2);
 	TrimString(str2);
@@ -281,7 +284,7 @@ bool ScriptProcessor::Section::IfProc(const std::string &expression)
 		}
 		else
 			break;
-	} while (1 == 1);
+	} while (true);
 	//find number of operators and recurse if multiple found
 	int operators;
 	int operators2;
@@ -343,7 +346,7 @@ bool ScriptProcessor::Section::IfProc(const std::string &expression)
 		}
 		else
 			break;
-	} while (1 == 1);
+	} while (true);
 	//return value if none found
 	if (operators == 0)
 		return ToBool(tmpcalc);
@@ -1041,31 +1044,31 @@ MeshObject* ScriptProcessor::Section::GetMeshObject(std::string name)
 	//get a system mesh object
 	if (name == "floor")
 	{
-		if (config->SectionNum == 2)
+		if (config->SectionNum == SECTION_FLOOR)
 			return Simcore->GetFloor(config->Current)->Level;
 		return 0;
 	}
 	else if (name == "interfloor")
 	{
-		if (config->SectionNum == 2)
+		if (config->SectionNum == SECTION_FLOOR)
 			return Simcore->GetFloor(config->Current)->Interfloor;
 		return 0;
 	}
 	else if (name == "columnframe")
 	{
-		if (config->SectionNum == 2)
+		if (config->SectionNum == SECTION_FLOOR)
 			return Simcore->GetFloor(config->Current)->ColumnFrame;
 		return 0;
 	}
 	else if (name == "elevatorcar")
 	{
-		if (config->SectionNum == 6)
+		if (config->SectionNum == SECTION_ELEVATORCAR)
 			return Simcore->GetElevator(config->CurrentOld)->GetCar(config->Current)->Mesh;
 		return 0;
 	}
 	else if (name == "elevator")
 	{
-		if (config->SectionNum == 4)
+		if (config->SectionNum == SECTION_ELEVATOR)
 			return Simcore->GetElevator(config->Current)->GetCar(1)->Mesh;
 		return 0;
 	}
@@ -1077,17 +1080,18 @@ MeshObject* ScriptProcessor::Section::GetMeshObject(std::string name)
 		return Simcore->Buildings;
 	else if (name.substr(0, 5) == "shaft")
 	{
-		if (config->SectionNum == 2)
+		if (config->SectionNum == SECTION_FLOOR)
 		{
 			//get a shaft mesh object, or a model in a shaft
 
 			std::string num, modelname;
 			int marker = (int)name.find(":");
-			if (marker > 0)
-				modelname = name.substr(marker + 1);
 
 			if (marker > 0)
+			{
+				modelname = name.substr(marker + 1);
 				num = name.substr(5, (int)name.length() - marker - 1);
+			}
 			else
 				num = name.substr(5);
 
@@ -1126,17 +1130,18 @@ MeshObject* ScriptProcessor::Section::GetMeshObject(std::string name)
 	}
 	else if (name.substr(0, 9) == "stairwell")
 	{
-		if (config->SectionNum == 2)
+		if (config->SectionNum == SECTION_FLOOR)
 		{
 			//get a stairwell mesh object, or a model in a stairwell
 
 			std::string num, modelname;
 			int marker = (int)name.find(":");
-			if (marker > 0)
-				modelname = name.substr(marker + 1);
 
 			if (marker > 0)
+			{
+				modelname = name.substr(marker + 1);
 				num = name.substr(9, (int)name.length() - marker - 1);
+			}
 			else
 				num = name.substr(9);
 
@@ -1178,11 +1183,11 @@ MeshObject* ScriptProcessor::Section::GetMeshObject(std::string name)
 
 	Model* model = 0;
 
-	if (config->SectionNum == 2)
+	if (config->SectionNum == SECTION_FLOOR)
 		model = Simcore->GetFloor(config->Current)->GetModel(name);
-	else if (config->SectionNum == 4)
+	else if (config->SectionNum == SECTION_ELEVATOR)
 		model = Simcore->GetElevator(config->Current)->GetCar(1)->GetModel(name);
-	else if (config->SectionNum == 6)
+	else if (config->SectionNum == SECTION_ELEVATORCAR)
 		model = Simcore->GetElevator(config->CurrentOld)->GetCar(config->Current)->GetModel(name);
 	else
 		model = Simcore->GetModel(name);
@@ -1306,13 +1311,18 @@ void ScriptProcessor::ConfigHandler::Reset()
 	RangeStartOld = 0;
 	Current = 0;
 	CurrentOld = 0;
-	SectionNum = 0;
+	SectionNum = SECTION_NONE;
 	Context = "None";
 	ContextOld = "";
 	ReverseAxis = false;
 	InWhile = false;
 	setshaftdoors = false;
 	CheckScript = false;
+	extrusion_texture = "";
+	extrusion_thickness = 0.0;
+	extrusion_tw = 0.0;
+	extrusion_th = 0.0;
+	extrude = false;
 }
 
 }
